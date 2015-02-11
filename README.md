@@ -1,6 +1,9 @@
 go-freshbooks
 =====
 This project implements a [Go](http://golang.org) client library for the [freshbooks API](http://developers.freshbooks.com/).
+
+Originally forked from [toggl/go-freshbooks](https://github.com/toggl/go-freshbooks) and will hopefully merge together eventually but this has been quite the departure.
+
 Supports token-based and OAuth authentication.
 
 Example usage

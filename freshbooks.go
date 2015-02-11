@@ -5,9 +5,10 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"github.com/tambet/oauthplain"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/tambet/oauthplain"
 )
 
 type (
@@ -26,18 +27,24 @@ type (
 		Method  string   `xml:"method,attr"`
 		PerPage int      `xml:"per_page"`
 		Page    int      `xml:"page"`
-	}
-	TimeEntryRequest struct {
-		XMLName   xml.Name  `xml:"request"`
-		Method    string    `xml:"method,attr"`
-		TimeEntry TimeEntry `xml:"time_entry"`
+
+		// optional filters used by various requests
+		Email     string     `xml:"email,omitempty"`
+		Username  string     `xml:"username,omitempty"`
+		DateFrom  *Date      `xml:"date_from,omitempty"`
+		DateTo    *Date      `xml:"date_to,omitempty"`
+		TaskId    string     `xml:"task_id,omitempty"`
+		ProjectId string     `xml:"project_id,omitempty"`
+		TimeEntry *TimeEntry `xml:"time_entry,omitempty"`
 	}
 	Response struct {
-		Error    string      `xml:"error"`
-		Clients  ClientList  `xml:"clients"`
-		Projects ProjectList `xml:"projects"`
-		Tasks    TaskList    `xml:"tasks"`
-		Users    UserList    `xml:"staff_members"`
+		Error       string          `xml:"error"`
+		Clients     ClientList      `xml:"clients"`
+		Projects    ProjectList     `xml:"projects"`
+		Tasks       TaskList        `xml:"tasks"`
+		Users       UserList        `xml:"staff_members"`
+		TimeEntries TimeEntriesList `xml:"time_entries"`
+		Contractors ContractorList  `xml:"contractors"`
 	}
 	TimeEntryResponse struct {
 		Status      string `xml:"status,attr"`
@@ -67,23 +74,32 @@ type (
 		Pagination
 		Users []User `xml:"member"`
 	}
+	TimeEntriesList struct {
+		Pagination
+		TimeEntries []TimeEntry `xml:"time_entry"`
+	}
+	ContractorList struct {
+		Pagination
+		Contractors []Contractor `xml:"contractor"`
+	}
+
 	Client struct {
-		ClientId int    `xml:"client_id"`
+		ClientId string `xml:"client_id"`
 		Name     string `xml:"organization"`
 	}
 	Project struct {
-		ProjectId int    `xml:"project_id"`
+		ProjectId string `xml:"project_id"`
 		ClientId  string `xml:"client_id"`
 		Name      string `xml:"name"`
 		TaskIds   []int  `xml:"tasks>task>task_id"`
 		UserIds   []int  `xml:"staff>staff>staff_id"`
 	}
 	Task struct {
-		TaskId int    `xml:"task_id"`
+		TaskId string `xml:"task_id"`
 		Name   string `xml:"name"`
 	}
 	User struct {
-		UserId    int    `xml:"staff_id"`
+		UserId    string `xml:"staff_id"`
 		Email     string `xml:"email"`
 		FirstName string `xml:"first_name"`
 		LastName  string `xml:"last_name"`
@@ -92,20 +108,25 @@ type (
 		TimeEntryId int     `xml:"time_entry_id"`
 		ProjectId   int     `xml:"project_id"` // Required
 		TaskId      int     `xml:"task_id"`    // Required
-		UserId      int     `xml:"staff_id"`   // Required
+		StaffId     string  `xml:"staff_id"`   // Required
 		Date        string  `xml:"date"`       // Required
 		Notes       string  `xml:"notes"`
 		Hours       float64 `xml:"hours"`
+	}
+	Contractor struct {
+		// XMLName      xml.Name `xml:"contractor"`
+		ContractorId string    `xml:"contractor_id"`
+		Name         string    `xml:"name"`
+		Email        string    `xml:"email"`
+		Rate         float64   `xml:rate`
+		TaskId       string    `xml:task_id`
+		Projects     []Project `xml:projects>project`
 	}
 )
 
 func NewApi(account string, token interface{}) *Api {
 	url := fmt.Sprintf("https://%s.freshbooks.com/api/2.1/xml-in", account)
 	fb := Api{apiUrl: url, perPage: 25}
-	fb.users = make([]User, 0)
-	fb.tasks = make([]Task, 0)
-	fb.clients = make([]Client, 0)
-	fb.projects = make([]Project, 0)
 
 	switch token.(type) {
 	case string:
@@ -116,129 +137,61 @@ func NewApi(account string, token interface{}) *Api {
 	return &fb
 }
 
-func (this *Api) Clients() ([]Client, error) {
-	err := this.fetchClients(1)
-	return this.clients, err
+func (r *Request) setDefaults(api *Api, method string) {
+	if r.PerPage < 1 {
+		r.PerPage = api.perPage
+	}
+	if r.Page < 1 {
+		r.Page = 1
+	}
+	r.Method = method
 }
 
-func (this *Api) Projects() ([]Project, error) {
-	err := this.fetchProjects(1)
-	return this.projects, err
+func (api *Api) ListClients(request Request) (*[]Client, error) {
+	request.setDefaults(api, "client.list")
+
+	response, err := api.request(request)
+	return &response.Clients.Clients, err
 }
 
-func (this *Api) Tasks() ([]Task, error) {
-	err := this.fetchTasks(1)
-	return this.tasks, err
+func (api *Api) ListTimeEntries(request Request) (*[]TimeEntry, *Pagination, error) {
+	request.setDefaults(api, "time_entry.list")
+	// s, _ := xml.Marshal(request)
+	// fmt.Printf("\n\n%s\n\n", s)
+
+	response, err := api.request(request)
+	return &response.TimeEntries.TimeEntries, &response.TimeEntries.Pagination, err
 }
 
-func (this *Api) Users() ([]User, error) {
-	err := this.fetchUsers(1)
-	return this.users, err
+func (api *Api) ListContractors(request Request) (*[]Contractor, *Pagination, error) {
+	request.setDefaults(api, "contractor.list")
+	// s, _ := xml.Marshal(request)
+	// fmt.Printf("\n\n%s\n\n", s)
+
+	response, err := api.request(request)
+	return &response.Contractors.Contractors, &response.Contractors.Pagination, err
 }
 
-func (this *Api) fetchClients(page int) error {
-	request := &Request{Method: "client.list", Page: page, PerPage: this.perPage}
-	result, err := this.makeRequest(request)
+func (api *Api) request(request Request) (Response, error) {
+	response := Response{}
+	// fmt.Printf("%#v", request)
+
+	result, err := api.makeRawRequest(request)
 	if err != nil {
-		return err
+		return response, err
 	}
-	parsedInto := Response{}
-	if err := xml.Unmarshal(*result, &parsedInto); err != nil {
-		return err
+
+	if err := xml.Unmarshal(*result, &response); err != nil {
+		return response, err
 	}
-	if len(parsedInto.Error) > 0 {
-		return errors.New(parsedInto.Error)
+	if len(response.Error) > 0 {
+		return response, errors.New(response.Error)
 	}
-	this.clients = append(this.clients, parsedInto.Clients.Clients...)
-	if parsedInto.Clients.Total > parsedInto.Clients.PerPage*page {
-		return this.fetchClients(page + 1)
-	}
-	return nil
+
+	return response, nil
 }
 
-func (this *Api) fetchProjects(page int) error {
-	request := &Request{Method: "project.list", Page: page, PerPage: this.perPage}
-	result, err := this.makeRequest(request)
-	if err != nil {
-		return err
-	}
-	parsedInto := Response{}
-	if err := xml.Unmarshal(*result, &parsedInto); err != nil {
-		return (err)
-	}
-	if len(parsedInto.Error) > 0 {
-		return errors.New(parsedInto.Error)
-	}
-	this.projects = append(this.projects, parsedInto.Projects.Projects...)
-	if parsedInto.Projects.Total > parsedInto.Projects.PerPage*page {
-		return this.fetchProjects(page + 1)
-	}
-	return nil
-}
-
-func (this *Api) fetchTasks(page int) error {
-	request := &Request{Method: "task.list", Page: page, PerPage: this.perPage}
-	result, err := this.makeRequest(request)
-	if err != nil {
-		return err
-	}
-	parsedInto := Response{}
-	if err := xml.Unmarshal(*result, &parsedInto); err != nil {
-		return err
-	}
-	if len(parsedInto.Error) > 0 {
-		return errors.New(parsedInto.Error)
-	}
-	this.tasks = append(this.tasks, parsedInto.Tasks.Tasks...)
-	if parsedInto.Tasks.Total > parsedInto.Tasks.PerPage*page {
-		return this.fetchTasks(page + 1)
-	}
-	return nil
-}
-
-func (this *Api) fetchUsers(page int) error {
-	request := &Request{Method: "staff.list", Page: page, PerPage: this.perPage}
-	result, err := this.makeRequest(request)
-	if err != nil {
-		return err
-	}
-	parsedInto := Response{}
-	if err := xml.Unmarshal(*result, &parsedInto); err != nil {
-		return err
-	}
-	if len(parsedInto.Error) > 0 {
-		return errors.New(parsedInto.Error)
-	}
-	this.users = append(this.users, parsedInto.Users.Users...)
-	if parsedInto.Users.Total > parsedInto.Users.PerPage*page {
-		return this.fetchUsers(page + 1)
-	}
-	return nil
-}
-
-func (this *Api) SaveTimeEntry(timeEntry *TimeEntry) (int, error) {
-	var method string
-	if timeEntry.TimeEntryId != 0 {
-		method = "time_entry.update"
-	} else {
-		method = "time_entry.create"
-	}
-	request := &TimeEntryRequest{Method: method, TimeEntry: *timeEntry}
-	result, err := this.makeRequest(request)
-	if err != nil {
-		return 0, err
-	}
-	parsedInto := TimeEntryResponse{}
-	if err := xml.Unmarshal(*result, &parsedInto); err != nil {
-		return 0, err
-	}
-	if parsedInto.Status == "ok" {
-		return parsedInto.TimeEntryId, nil
-	}
-	return 0, errors.New(parsedInto.Error)
-}
-
-func (this *Api) makeRequest(request interface{}) (*[]byte, error) {
+func (this *Api) makeRawRequest(request interface{}) (*[]byte, error) {
 	xmlRequest, err := xml.MarshalIndent(request, "", "  ")
 	if err != nil {
 		return nil, err
