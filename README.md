@@ -12,10 +12,10 @@ Example usage
 ```go
 api := freshbooks.NewApi("<<AccountName>>", "<<AuthToken>>")
 
-users, err := api.Users()
-tasks, err := api.Tasks()
-clients, err := api.Clients()
-projects, err := api.Projects()
+clients, pageInfo, err := api.ListClients(&freshbooks.Request{})
+projects, pageInfo, err := api.ListProjects(&freshbooks.Request{})
+invoices, pageInfo, err := api.ListInvoices(&freshbooks.Request{})
+timeEntries, pageInfo,err := api.ListTimeEntries(&freshbooks.Request{})
 ```
 
 OAuth authentication

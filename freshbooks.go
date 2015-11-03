@@ -30,13 +30,17 @@ type (
 		Page    int      `xml:"page"`
 
 		// optional filters used by various requests
-		Email     string     `xml:"email,omitempty"`
-		Username  string     `xml:"username,omitempty"`
-		DateFrom  *Date      `xml:"date_from,omitempty"`
-		DateTo    *Date      `xml:"date_to,omitempty"`
-		TaskId    string     `xml:"task_id,omitempty"`
-		ProjectId string     `xml:"project_id,omitempty"`
-		TimeEntry *TimeEntry `xml:"time_entry,omitempty"`
+		Email      string     `xml:"email,omitempty"`
+		Username   string     `xml:"username,omitempty"`
+		DateFrom   *Date      `xml:"date_from,omitempty"`
+		DateTo     *Date      `xml:"date_to,omitempty"`
+		UpdateFrom *Date      `xml:"update_from,omitempty"`
+		UpdateTo   *Date      `xml:"update_to,omitempty"`
+		TaskId     string     `xml:"task_id,omitempty"`
+		ProjectId  string     `xml:"project_id,omitempty"`
+		ClientId   string     `xml:"client_id,omitempty"`
+		InvoiceId  string     `xml:"invoice_id,omitempty"`
+		TimeEntry  *TimeEntry `xml:"time_entry,omitempty"`
 	}
 	Response struct {
 		Error       string          `xml:"error"`
@@ -47,6 +51,7 @@ type (
 		TimeEntries TimeEntriesList `xml:"time_entries"`
 		Contractors ContractorList  `xml:"contractors"`
 		Invoices    InvoiceList     `xml:"invoices"`
+		// Payments    PaymentList     `xml:"payments"`
 	}
 	TimeEntryResponse struct {
 		Status      string `xml:"status,attr"`
@@ -88,6 +93,10 @@ type (
 		Pagination
 		Invoices []Invoice `xml:"invoice"`
 	}
+	// PaymentList struct {
+	// 	Pagination
+	// 	Payments []Payment `xml:"payments"`
+	// }
 
 	Client struct {
 		ClientId string `xml:"client_id"`
@@ -149,6 +158,15 @@ type (
 		Quantity int    `xml:"quantity"`
 		Type     string `xml:"type"`
 	}
+	// Payment struct {
+	// 	PaymentId    int    `xml:"payment_id"`
+	// 	InvoiceId    int    `xml:"invoice_id"`
+	// 	Date         fbTime `xml:"date"`
+	// 	Updated      fbTime `xml:"updated"`
+	// 	ClientId     int    `xml:"client_id"`
+	// 	CurrencyCode int    `xml:"currency_code"`
+	// 	Amount       string `xml:"amount"`
+	// }
 	fbTime time.Time
 )
 
@@ -202,6 +220,13 @@ func (api *Api) ListInvoices(request Request) (*[]Invoice, *Pagination, error) {
 	response, err := api.request(request)
 	return &response.Invoices.Invoices, &response.Invoices.Pagination, err
 }
+
+// func (api *Api) ListPayments(request Request) (*[]Payment, *Pagination, error) {
+// 	request.setDefaults(api, "payment.list")
+//
+// 	response, err := api.request(request)
+// 	return &response.Payments.Payments, &response.Payments.Pagination, err
+// }
 
 func (api *Api) request(request Request) (Response, error) {
 	response := Response{}
