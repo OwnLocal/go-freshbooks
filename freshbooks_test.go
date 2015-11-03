@@ -30,19 +30,7 @@ func loadTestConfig(t *testing.T) *authConfig {
 	return &config
 }
 
-// func TestGetUsers(t *testing.T) {
-// 	conf := loadTestConfig(t)
-// 	api := NewApi(conf.AccountName, conf.AuthToken)
-// 	users, err := api.Users()
-// 	if err != nil {
-// 		t.Fatal("Freshbooks retured an error:", err.Error())
-// 	}
-// 	if len(users) < 1 {
-// 		t.Fatal("There should be at least one user")
-// 	}
-// }
-
-func TestListUsers(t *testing.T) {
+func TestListClients(t *testing.T) {
 	conf := loadTestConfig(t)
 	api := NewApi(conf.AccountName, conf.AuthToken)
 
@@ -56,30 +44,15 @@ func TestListUsers(t *testing.T) {
 
 }
 
-func TestListTimeEntries(t *testing.T) {
+func TestListInvoices(t *testing.T) {
 	conf := loadTestConfig(t)
 	api := NewApi(conf.AccountName, conf.AuthToken)
 
-	timeEntries, paging, err := api.ListTimeEntries(Request{DateFrom: &Date{time.Now()}})
+	now := time.Now()
+	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	invoices, paging, err := api.ListInvoices(Request{DateFrom: &Date{firstOfMonth}})
 	assert.NoError(t, err)
-	assert.True(t, len(*timeEntries) > 0, "Time Entries length should be greater than zero")
+	assert.True(t, len(*invoices) > 0, "Invoices length should be greater than zero")
 	assert.Equal(t, paging.Page, 1)
 }
-
-// func TestOAuth(t *testing.T) {
-// 	conf := loadTestConfig(t)
-// 	token := &oauthplain.Token{
-// 		ConsumerKey:      conf.ConsumerKey,
-// 		ConsumerSecret:   conf.ConsumerSecret,
-// 		OAuthToken:       conf.OAuthToken,
-// 		OAuthTokenSecret: conf.OAuthTokenSecret,
-// 	}
-// 	api := NewApi(conf.AccountName, token)
-// 	clients, err := api.ListClients(ClientListRequest{})
-// 	if err != nil {
-// 		t.Fatal("Freshbooks retured an error:", err.Error())
-// 	}
-// 	if len(*clients) < 1 {
-// 		t.Fatal("There should be at least one client")
-// 	}
-// }

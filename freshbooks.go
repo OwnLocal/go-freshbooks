@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/tambet/oauthplain"
 )
@@ -45,6 +46,7 @@ type (
 		Users       UserList        `xml:"staff_members"`
 		TimeEntries TimeEntriesList `xml:"time_entries"`
 		Contractors ContractorList  `xml:"contractors"`
+		Invoices    InvoiceList     `xml:"invoices"`
 	}
 	TimeEntryResponse struct {
 		Status      string `xml:"status,attr"`
@@ -81,6 +83,10 @@ type (
 	ContractorList struct {
 		Pagination
 		Contractors []Contractor `xml:"contractor"`
+	}
+	InvoiceList struct {
+		Pagination
+		Invoices []Invoice `xml:"invoice"`
 	}
 
 	Client struct {
@@ -122,6 +128,28 @@ type (
 		TaskId       string    `xml:task_id`
 		Projects     []Project `xml:projects>project`
 	}
+	Invoice struct {
+		InvoiceId         int        `xml:"invoice_id"`
+		ClientId          int        `xml:"client_id"`
+		Number            string     `xml:"number"`
+		Amount            string     `xml:"amount"`
+		CurrencyCode      string     `xml:"currency_code"`
+		AmountOutstanding string     `xml:"amount_outstanding"`
+		Status            string     `xml:"paid"`
+		Date              fbTime     `xml:"date"`
+		Updated           fbTime     `xml:"updated"`
+		Orgnization       string     `xml:"organization"`
+		LineItems         []LineItem `xml:"lines"`
+	}
+	LineItem struct {
+		LineId   int    `xml:"line_id"`
+		Amount   string `xml:"amount"`
+		Name     string `xml:"name"`
+		UnitCost string `xml:"unit_cost"`
+		Quantity int    `xml:"quantity"`
+		Type     string `xml:"type"`
+	}
+	fbTime time.Time
 )
 
 func NewApi(account string, token interface{}) *Api {
@@ -156,8 +184,6 @@ func (api *Api) ListClients(request Request) (*[]Client, error) {
 
 func (api *Api) ListTimeEntries(request Request) (*[]TimeEntry, *Pagination, error) {
 	request.setDefaults(api, "time_entry.list")
-	// s, _ := xml.Marshal(request)
-	// fmt.Printf("\n\n%s\n\n", s)
 
 	response, err := api.request(request)
 	return &response.TimeEntries.TimeEntries, &response.TimeEntries.Pagination, err
@@ -165,11 +191,16 @@ func (api *Api) ListTimeEntries(request Request) (*[]TimeEntry, *Pagination, err
 
 func (api *Api) ListContractors(request Request) (*[]Contractor, *Pagination, error) {
 	request.setDefaults(api, "contractor.list")
-	// s, _ := xml.Marshal(request)
-	// fmt.Printf("\n\n%s\n\n", s)
 
 	response, err := api.request(request)
 	return &response.Contractors.Contractors, &response.Contractors.Pagination, err
+}
+
+func (api *Api) ListInvoices(request Request) (*[]Invoice, *Pagination, error) {
+	request.setDefaults(api, "invoice.list")
+
+	response, err := api.request(request)
+	return &response.Invoices.Invoices, &response.Invoices.Pagination, err
 }
 
 func (api *Api) request(request Request) (Response, error) {
@@ -222,4 +253,21 @@ func (this *Api) makeRawRequest(request interface{}) (*[]byte, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (t *fbTime) UnmarshalText(b []byte) error {
+	result, err := time.Parse("2006-01-02 15:04:05", string(b))
+	if err != nil {
+		var t2 time.Time
+		err = t2.UnmarshalText(b)
+		if err != nil {
+			return err
+		}
+		*t = fbTime(t2)
+		return nil
+	}
+
+	// Save as data
+	*t = fbTime(result)
+	return nil
 }
