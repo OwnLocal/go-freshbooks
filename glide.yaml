@@ -1,6 +1,0 @@
-package: github.com/kjaleshire/go-freshbooks
-import:
-  - package: github.com/tambet/oauthplain
-  - package: github.com/stretchr/testify
-    subpackages:
-      - /assert

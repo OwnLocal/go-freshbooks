@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
+	"strconv"
+	"strings"
 
 	"github.com/tambet/oauthplain"
 )
@@ -51,7 +52,6 @@ type (
 		TimeEntries TimeEntriesList `xml:"time_entries"`
 		Contractors ContractorList  `xml:"contractors"`
 		Invoices    InvoiceList     `xml:"invoices"`
-		// Payments    PaymentList     `xml:"payments"`
 	}
 	TimeEntryResponse struct {
 		Status      string `xml:"status,attr"`
@@ -93,11 +93,6 @@ type (
 		Pagination
 		Invoices []Invoice `xml:"invoice"`
 	}
-	// PaymentList struct {
-	// 	Pagination
-	// 	Payments []Payment `xml:"payments"`
-	// }
-
 	Client struct {
 		ClientId string `xml:"client_id"`
 		Name     string `xml:"organization"`
@@ -141,33 +136,24 @@ type (
 		InvoiceId         int        `xml:"invoice_id"`
 		ClientId          int        `xml:"client_id"`
 		Number            string     `xml:"number"`
-		Amount            string     `xml:"amount"`
+		Amount            Currency   `xml:"amount"`
 		CurrencyCode      string     `xml:"currency_code"`
-		AmountOutstanding string     `xml:"amount_outstanding"`
-		Status            string     `xml:"paid"`
-		Date              fbTime     `xml:"date"`
-		Updated           fbTime     `xml:"updated"`
-		Orgnization       string     `xml:"organization"`
+		AmountOutstanding Currency   `xml:"amount_outstanding"`
+		Status            string     `xml:"status"`
+		Date              Date       `xml:"date"`
+		Updated           Date       `xml:"updated"`
+		Organization      string     `xml:"organization"`
 		LineItems         []LineItem `xml:"lines"`
 	}
 	LineItem struct {
-		LineId   int    `xml:"line_id"`
-		Amount   string `xml:"amount"`
-		Name     string `xml:"name"`
-		UnitCost string `xml:"unit_cost"`
-		Quantity int    `xml:"quantity"`
-		Type     string `xml:"type"`
+		LineId   int      `xml:"line_id"`
+		Amount   Currency `xml:"amount"`
+		Name     string   `xml:"name"`
+		UnitCost Currency `xml:"unit_cost"`
+		Quantity int      `xml:"quantity"`
+		Type     string   `xml:"type"`
 	}
-	// Payment struct {
-	// 	PaymentId    int    `xml:"payment_id"`
-	// 	InvoiceId    int    `xml:"invoice_id"`
-	// 	Date         fbTime `xml:"date"`
-	// 	Updated      fbTime `xml:"updated"`
-	// 	ClientId     int    `xml:"client_id"`
-	// 	CurrencyCode int    `xml:"currency_code"`
-	// 	Amount       string `xml:"amount"`
-	// }
-	fbTime time.Time
+	Currency uint
 )
 
 func NewApi(account string, token interface{}) *Api {
@@ -221,13 +207,6 @@ func (api *Api) ListInvoices(request Request) (*[]Invoice, *Pagination, error) {
 	return &response.Invoices.Invoices, &response.Invoices.Pagination, err
 }
 
-// func (api *Api) ListPayments(request Request) (*[]Payment, *Pagination, error) {
-// 	request.setDefaults(api, "payment.list")
-//
-// 	response, err := api.request(request)
-// 	return &response.Payments.Payments, &response.Payments.Pagination, err
-// }
-
 func (api *Api) request(request Request) (Response, error) {
 	response := Response{}
 	// fmt.Printf("%#v", request)
@@ -280,19 +259,40 @@ func (this *Api) makeRawRequest(request interface{}) (*[]byte, error) {
 	return &result, nil
 }
 
-func (t *fbTime) UnmarshalText(b []byte) error {
-	result, err := time.Parse("2006-01-02 15:04:05", string(b))
-	if err != nil {
-		var t2 time.Time
-		err = t2.UnmarshalText(b)
-		if err != nil {
-			return err
-		}
-		*t = fbTime(t2)
+func (c *Currency) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	// Encoding tokens manually to inject attributes and comments
+	dollars := *c / 100
+	cents := *c % 100
+	e.EncodeElement([]byte(fmt.Sprintf("%d.%d", dollars, cents)), start)
+	return nil
+}
+
+func (c *Currency) MarshalJSON() ([]byte, error) {
+	// Encoding tokens manually to inject attributes and comments
+	dollars := *c / 100
+	cents := *c % 100
+	return []byte(fmt.Sprintf("%d.%d", dollars, cents)), nil
+}
+
+func (c *Currency) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var v string
+	d.DecodeElement(&v, &start)
+
+	splitAmts := strings.Split(v, ".")
+	if len(splitAmts) != 2 {
 		return nil
 	}
 
-	// Save as data
-	*t = fbTime(result)
+	dollars, err := strconv.Atoi(splitAmts[0])
+	if err != nil {
+		return nil
+	}
+
+	cents, err := strconv.Atoi(splitAmts[1])
+	if err != nil {
+		return nil
+	}
+
+	*c = Currency(cents + (dollars * 100))
 	return nil
 }

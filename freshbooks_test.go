@@ -53,16 +53,7 @@ func TestListInvoices(t *testing.T) {
 
 	invoices, paging, err := api.ListInvoices(Request{DateFrom: &Date{firstOfMonth}})
 	assert.NoError(t, err)
+	// pretty.Print(*invoices)
 	assert.True(t, len(*invoices) > 0, "Invoices length should be greater than zero")
 	assert.Equal(t, paging.Page, 1)
 }
-
-// func TestListPayments(t *testing.T) {
-// 	conf := loadTestConfig(t)
-// 	api := NewApi(conf.AccountName, conf.AuthToken)
-//
-// 	payments, paging, err := api.ListPayments(Request{})
-// 	assert.NoError(t, err)
-// 	assert.True(t, len(*payments) > 0, "Payments length should be greater than zero")
-// 	assert.Equal(t, paging.Page, 1)
-// }
