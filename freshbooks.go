@@ -62,8 +62,9 @@ type (
 	}
 	Pagination struct {
 		Page    int `xml:"page,attr"`
-		Total   int `xml:"total,attr"`
 		PerPage int `xml:"per_page,attr"`
+		Pages   int `xml:"pages,attr"`
+		Total   int `xml:"total,attr"`
 	}
 	ClientList struct {
 		Pagination
