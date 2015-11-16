@@ -31,17 +31,17 @@ type (
 		Page    int      `xml:"page"`
 
 		// optional filters used by various requests
-		Email      string     `xml:"email,omitempty"`
-		Username   string     `xml:"username,omitempty"`
-		DateFrom   *Date      `xml:"date_from,omitempty"`
-		DateTo     *Date      `xml:"date_to,omitempty"`
-		UpdateFrom *Date      `xml:"update_from,omitempty"`
-		UpdateTo   *Date      `xml:"update_to,omitempty"`
-		TaskId     string     `xml:"task_id,omitempty"`
-		ProjectId  string     `xml:"project_id,omitempty"`
-		ClientId   string     `xml:"client_id,omitempty"`
-		InvoiceId  string     `xml:"invoice_id,omitempty"`
-		TimeEntry  *TimeEntry `xml:"time_entry,omitempty"`
+		Email       string     `xml:"email,omitempty"`
+		Username    string     `xml:"username,omitempty"`
+		DateFrom    *Date      `xml:"date_from,omitempty"`
+		DateTo      *Date      `xml:"date_to,omitempty"`
+		UpdatedFrom *Date      `xml:"updated_from,omitempty"`
+		UpdatedTo   *Date      `xml:"updated_to,omitempty"`
+		TaskId      string     `xml:"task_id,omitempty"`
+		ProjectId   string     `xml:"project_id,omitempty"`
+		ClientId    string     `xml:"client_id,omitempty"`
+		InvoiceId   string     `xml:"invoice_id,omitempty"`
+		TimeEntry   *TimeEntry `xml:"time_entry,omitempty"`
 	}
 	Response struct {
 		Error       string          `xml:"error"`
